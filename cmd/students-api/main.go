@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/anukool23/usermanagement-lms-go/internal/config"
 )
@@ -37,4 +40,13 @@ func main() {
 		}
 	}()
 	<-done
+
+	slog.Info("Shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := server.Shutdown(ctx)
+	if err != nil {
+		slog.Error("Failed to shutdown server: ", slog.String("error", err.Error()))
+	}
+	slog.Info("Server gracefully stopped")
 }
