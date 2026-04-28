@@ -12,6 +12,7 @@ import (
 
 	"github.com/anukool23/usermanagement-lms-go/internal/config"
 	"github.com/anukool23/usermanagement-lms-go/internal/http/handlers/student"
+	"github.com/anukool23/usermanagement-lms-go/internal/storage/sqlite"
 )
 
 func main() {
@@ -19,11 +20,16 @@ func main() {
 	cfg := config.MustLoad()
 
 	//database setup
+	storage, err := sqlite.New(cfg)
+	if err != nil {
+		slog.Error("Failed to initialize storage: ", slog.String("error", err.Error()))
+	}
+	slog.Info("Storage initialized successfully", slog.String("env", cfg.Env))
 
 	//setup router
 	router := http.NewServeMux()
 
-	router.HandleFunc("POST /api/students", student.New())
+	router.HandleFunc("POST /api/students", student.New(storage))
 	//setup server
 	server := http.Server{
 		Addr:    cfg.Port,
@@ -44,7 +50,7 @@ func main() {
 	slog.Info("Shutting down server...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := server.Shutdown(ctx)
+	err = server.Shutdown(ctx)
 	if err != nil {
 		slog.Error("Failed to shutdown server: ", slog.String("error", err.Error()))
 	}
