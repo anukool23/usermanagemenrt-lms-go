@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/anukool23/usermanagement-lms-go/internal/config"
-	"github.com/anukool23/usermanagement-lms-go/internal/http/handlers/student"
+	"github.com/anukool23/usermanagement-lms-go/internal/http/middleware"
+	"github.com/anukool23/usermanagement-lms-go/internal/http/routes"
 	"github.com/anukool23/usermanagement-lms-go/internal/storage/sqlite"
 )
 
@@ -28,15 +29,26 @@ func main() {
 
 	//setup router
 	router := http.NewServeMux()
+	routes.Register(router, storage)
 
-	router.HandleFunc("POST /api/student", student.New(storage))
-	router.HandleFunc("GET /api/student/{id}", student.GetById(storage))
-	router.HandleFunc("GET /api/students", student.ListStudents(storage))
-	router.HandleFunc("DELETE /api/student/{id}", student.DeleteById(storage))
+	allowedSecretKeys := []string{
+		"7b8d9f7b8d9f7",
+		"7b8d9f7b8d9f8",
+	}
+
+	handler := middleware.Chain(
+		router,
+		middleware.SecretKeyAuth(allowedSecretKeys),
+	)
+
 	//setup server
 	server := http.Server{
-		Addr:    cfg.Port,
-		Handler: router,
+		Addr:              cfg.Port,
+		Handler:           handler,
+		ReadHeaderTimeout: 2 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 
