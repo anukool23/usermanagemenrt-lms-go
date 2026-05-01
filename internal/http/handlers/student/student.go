@@ -21,34 +21,37 @@ func New(storage storage.Storage) http.HandlerFunc {
 		var student types.Student
 		err := json.NewDecoder(r.Body).Decode(&student)
 		if errors.Is(err, io.EOF) {
-			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body")))
-			slog.Error("Empty request body", slog.String("error", err.Error()))
+			response.HandleError(w, r.URL.Path, "empty body", 400, err)
 			return
 		}
 
 		if err != nil {
-			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(err))
+			response.HandleError(w, r.URL.Path, "invalid request payload", 400, err)
 			return
 		}
 
 		//request validation
 		if err := validator.New().Struct(student); err != nil {
 			validateErrs := err.(validator.ValidationErrors)
-			response.WriteJSON(w, http.StatusBadRequest, response.ValidationError(validateErrs))
+			_ = response.WriteJSON(w, http.StatusBadRequest, response.ValidationError(validateErrs))
 			return
 		}
 
 		existingStudent, err := storage.GetStudentByEmail(student.Email)
 		if err == nil && existingStudent.Id != 0 {
-			response.WriteJSON(w, http.StatusConflict, response.GeneralError(fmt.Errorf("student with email %s already exists", student.Email)))
-			slog.Error("Student with email already exists", slog.String("email", student.Email))
+			response.HandleError(
+				w,
+				r.URL.Path,
+				fmt.Sprintf("student with email %s already exists", student.Email),
+				409,
+				nil,
+			)
 			return
 		}
 
 		lastId, err := storage.CreateStudent(student.Name, student.Email, student.Age)
 		if err != nil {
-			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
-			slog.Error("Failed to create student", slog.String("error", err.Error()))
+			response.HandleError(w, r.URL.Path, "failed to create student", 500, err)
 			return
 		}
 		slog.Info("Student created successfully", slog.Int64("id", lastId))
@@ -63,14 +66,12 @@ func GetById(storage storage.Storage) http.HandlerFunc {
 
 		intId, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
-			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("invalid student ID")))
-			slog.Error("Invalid student ID", slog.String("error", err.Error()))
+			response.HandleError(w, r.URL.Path, "invalid student ID", 400, err)
 			return
 		}
 		studentDetail, err := storage.GetStudentById(intId)
 		if err != nil {
-			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
-			slog.Error("Failed to get student by ID", slog.String("error", err.Error()))
+			response.HandleError(w, r.URL.Path, "failed to get student by id", 500, err)
 			return
 		}
 		slog.Info("Student retrieved successfully", slog.String("id", id))
@@ -83,11 +84,11 @@ func ListStudents(storage storage.Storage) http.HandlerFunc{
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("Listing all students")
 
-		students, err := storage.ListStudents()
-		if err != nil {
-			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(err))
-			return
-		}
+			students, err := storage.ListStudents()
+			if err != nil {
+				response.HandleError(w, r.URL.Path, "failed to list students", 400, err)
+				return
+			}
 		slog.Info("Students retrieved successfully", slog.Int("count", len(students)))
 		response.WriteJSON(w, http.StatusOK, students)
 	}
@@ -100,15 +101,15 @@ func DeleteById(storage storage.Storage) http.HandlerFunc {
 		intId, err := strconv.ParseInt(id, 10, 64)
 
 		if err != nil{
-			response.WriteJSON(w, http.StatusBadGateway, response.GeneralError(err))
+			response.HandleError(w, r.URL.Path, "invalid student ID", 400, err)
+			return
 		}
 
-			err = storage.DeleteStudentById(intId)
-			if err != nil {
-				response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
-				slog.Error("Failed to delete student by ID", slog.String("error", err.Error()))
-				return
-			}
+				err = storage.DeleteStudentById(intId)
+				if err != nil {
+					response.HandleError(w, r.URL.Path, "failed to delete student by id", 500, err)
+					return
+				}
 			slog.Info("Student deleted successfully", slog.String("id", id))
 			response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Student deleted successfully"})
 	}

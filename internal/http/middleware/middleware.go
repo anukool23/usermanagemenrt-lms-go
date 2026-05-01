@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/anukool23/usermanagement-lms-go/internal/utils/response"
@@ -26,7 +25,7 @@ func SecretKeyAuth(allowedKeys []string) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			secretKey := r.Header.Get("x-secret-key")
 			if _, ok := allowed[secretKey]; !ok {
-				_ = response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(fmt.Errorf("unauthorized")))
+				response.HandleError(w, r.URL.Path, "unauthorized", 401, nil)
 				return
 			}
 
