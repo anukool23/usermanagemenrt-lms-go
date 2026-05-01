@@ -29,12 +29,16 @@ func main() {
 	//setup router
 	router := http.NewServeMux()
 
-	router.HandleFunc("POST /api/students", student.New(storage))
+	router.HandleFunc("POST /api/student", student.New(storage))
+	router.HandleFunc("GET /api/student/{id}", student.GetById(storage))
+	router.HandleFunc("GET /api/students", student.ListStudents(storage))
+	router.HandleFunc("DELETE /api/student/{id}", student.DeleteById(storage))
 	//setup server
 	server := http.Server{
 		Addr:    cfg.Port,
 		Handler: router,
 	}
+
 
 	log.Printf("Server started on %s", cfg.Port)
 	done := make(chan os.Signal, 1)
